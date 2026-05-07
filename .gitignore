@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+.DS_Store
+samples/*.csv
+!samples/.gitkeep
+mysql_data/
