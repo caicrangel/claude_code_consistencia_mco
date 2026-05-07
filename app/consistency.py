@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time
+from typing import Iterable
+
 import pandas as pd
 from sqlalchemy import select
 
@@ -22,8 +25,16 @@ def _classificar(distancia_m: int, extensao_m: int | None, percentual_min: float
     return (STATUS_ATENDEU if pct >= percentual_min else STATUS_NAO_ATENDEU, pct)
 
 
-def consistir_lote(lote_id: int | None = None, percentual_min: float | None = None) -> pd.DataFrame:
-    """Cruza viagens (filtradas por lote, se informado) com parâmetros e classifica."""
+def consistir_lote(
+    lote_id: int | None = None,
+    percentual_min: float | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    operadoras: Iterable[str] | None = None,
+    garagens: Iterable[str] | None = None,
+    linhas: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    """Cruza viagens (com filtros opcionais) e parâmetros, classificando cada viagem."""
     pmin = percentual_min if percentual_min is not None else PERCENTUAL_MINIMO
 
     with session_scope() as s:
@@ -59,6 +70,16 @@ def consistir_lote(lote_id: int | None = None, percentual_min: float | None = No
         )
         if lote_id is not None:
             stmt = stmt.where(ViagemMCO.lote_id == lote_id)
+        if data_inicio is not None:
+            stmt = stmt.where(ViagemMCO.data_hora_inicio >= datetime.combine(data_inicio, time.min))
+        if data_fim is not None:
+            stmt = stmt.where(ViagemMCO.data_hora_inicio <= datetime.combine(data_fim, time.max))
+        if operadoras:
+            stmt = stmt.where(ViagemMCO.nome_operadora.in_(list(operadoras)))
+        if garagens:
+            stmt = stmt.where(ViagemMCO.nome_garagem.in_(list(garagens)))
+        if linhas:
+            stmt = stmt.where(ViagemMCO.codigo_externo_linha.in_(list(linhas)))
 
         viagens = s.execute(stmt).all()
 

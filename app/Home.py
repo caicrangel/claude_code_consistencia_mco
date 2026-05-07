@@ -26,11 +26,13 @@ necessária para o pagamento da remuneração complementar.
 
 1. **Parâmetros** — cadastre a extensão (em metros) de cada `Linha + Sublinha`.
 2. **Importar MCO** — suba o CSV diário. Linhas duplicadas (mesmo `Viagem` ID) são ignoradas.
-3. **Consistência** — visualize os resultados, filtre por lote, exporte.
+3. **Consistência** — visualize os resultados por lote, filtre, exporte.
+4. **Dashboard** — KPIs e gráficos por período, operadora, garagem e linha.
 """
 )
 
 st.info(
-    "Use o menu lateral para navegar entre **Parâmetros**, **Importar MCO** e **Consistência**.",
+    "Use o menu lateral para navegar entre **Parâmetros**, **Importar MCO**, "
+    "**Consistência** e **Dashboard**.",
     icon="👈",
 )
