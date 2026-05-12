@@ -26,26 +26,74 @@ CREATE TABLE IF NOT EXISTS lote_importacao (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS viagem_mco (
-    id                       BIGINT AUTO_INCREMENT PRIMARY KEY,
-    lote_id                  INT          NOT NULL,
-    nome_operadora           VARCHAR(150) NULL,
-    nome_garagem             VARCHAR(150) NULL,
-    codigo_interno_linha     VARCHAR(30)  NULL,
-    codigo_externo_linha     VARCHAR(20)  NOT NULL,
-    nome_linha               VARCHAR(255) NULL,
-    tipo_viagem              VARCHAR(20)  NULL,
-    numero_veiculo           VARCHAR(20)  NULL,
-    desc_tipo_veiculo        VARCHAR(50)  NULL,
-    sublinha                 VARCHAR(10)  NOT NULL,
-    data_hora_inicio         DATETIME     NULL,
-    data_hora_fim            DATETIME     NULL,
-    catraca_inicial          BIGINT       NULL,
-    catraca_final            BIGINT       NULL,
-    distancia_metros         INT          NOT NULL DEFAULT 0,
-    viagem_id_externo        VARCHAR(30)  NULL,
+    id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    lote_id                     INT          NOT NULL,
+
+    -- Identificação operadora / linha
+    codigo_operadora            VARCHAR(30)  NULL,
+    nome_operadora              VARCHAR(150) NULL,
+    nome_garagem                VARCHAR(150) NULL,
+    codigo_interno_linha        VARCHAR(30)  NULL,
+    codigo_externo_linha        VARCHAR(20)  NOT NULL,
+    nome_linha                  VARCHAR(255) NULL,
+    num_terminal                VARCHAR(30)  NULL,
+
+    -- Viagem (texto Nor./Extra) e veículo
+    tipo_viagem                 VARCHAR(20)  NULL,
+    codigo_veiculo              VARCHAR(30)  NULL,
+    numero_veiculo              VARCHAR(20)  NULL,
+    desc_tipo_veiculo           VARCHAR(50)  NULL,
+    codigo_equipamento          VARCHAR(30)  NULL,
+    numero_serie_equipamento    VARCHAR(50)  NULL,
+
+    -- Sublinha e tempos
+    sublinha                    VARCHAR(10)  NOT NULL,
+    data_hora_inicio            DATETIME     NULL,
+    data_hora_fim               DATETIME     NULL,
+
+    -- Catracas / distância
+    cartao_motorista            VARCHAR(30)  NULL,
+    cartao_cobrador             VARCHAR(30)  NULL,
+    catraca_pendente            TINYINT      NULL,
+    catraca_inicial             BIGINT       NULL,
+    catraca_final               BIGINT       NULL,
+    distancia_metros            INT          NOT NULL DEFAULT 0,
+
+    -- Identificador externo da viagem (coluna W)
+    viagem_id_externo           VARCHAR(30)  NULL,
+
+    -- Metadados de viagem
+    orgao_gestor                VARCHAR(30)  NULL,
+    cmp_ter_sub                 VARCHAR(30)  NULL,
+    tipo_viagem_codigo          VARCHAR(20)  NULL,
+    data_hora_saida_terminal    DATETIME     NULL,
+    coleta_pendente             TINYINT      NULL,
+
+    -- Contagens
+    passageiros                 INT          NULL,
+    inteiras                    INT          NULL,
+    vt                          INT          NULL,
+    vt_integracao               INT          NULL,
+    gratuidade                  INT          NULL,
+    passagens                   INT          NULL,
+    bilhete_unitario            INT          NULL,
+    passagens_integracao        INT          NULL,
+    estudantes                  INT          NULL,
+    estudantes_integracao       INT          NULL,
+
+    -- Outros
+    intervalo_viagem            VARCHAR(20)  NULL,
+    terminal                    VARCHAR(30)  NULL,
+    data_coleta                 DATE         NULL,
+    tipo_data                   VARCHAR(30)  NULL,
+    data_hora_inicio_alt        DATETIME     NULL,
+    data_hora_insercao          DATETIME     NULL,
+
     INDEX ix_lote (lote_id),
     INDEX ix_linha_sublinha (codigo_externo_linha, sublinha),
     INDEX ix_inicio (data_hora_inicio),
+    INDEX ix_veiculo (numero_veiculo),
+    INDEX ix_operadora (nome_operadora),
     UNIQUE KEY uq_viagem_externa (viagem_id_externo),
     CONSTRAINT fk_viagem_lote FOREIGN KEY (lote_id) REFERENCES lote_importacao(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

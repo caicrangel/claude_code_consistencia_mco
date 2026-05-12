@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import IO
 
 import pandas as pd
@@ -12,24 +12,67 @@ from app.db import session_scope
 from app.models import LoteImportacao, ViagemMCO
 
 
-COLUNAS_ESPERADAS = {
+# Mapeamento direto coluna do CSV -> campo do modelo.
+# Observações:
+#  - "Viagem" aparece DUAS vezes no CSV: a coluna H é o tipo (Nor./Extra),
+#    a coluna W é o ID numérico da viagem. Pandas renomeia a segunda como "Viagem.1".
+#  - Aqui mapeamos a primeira ocorrência ("Viagem") como tipo_viagem.
+#    A segunda ("Viagem.1") é tratada à parte como viagem_id_externo.
+COLUNAS_TEXTO = {
+    "Código Operadora": "codigo_operadora",
     "Nome Operadora": "nome_operadora",
     "Nome Garagem": "nome_garagem",
     "Código Interno Linha": "codigo_interno_linha",
     "Código Externo Linha": "codigo_externo_linha",
     "Nome Linha": "nome_linha",
+    "Num Terminal": "num_terminal",
     "Viagem": "tipo_viagem",
+    "Código Veículo": "codigo_veiculo",
     "Numero Veículo": "numero_veiculo",
     "Desc. Tipo Veículo": "desc_tipo_veiculo",
+    "Código Equipamento": "codigo_equipamento",
+    "Numero de Série do Equipamento": "numero_serie_equipamento",
     "Sub Linha": "sublinha",
-    "Data Hora Início Operação": "data_hora_inicio",
-    "Data Hora Final Operação": "data_hora_fim",
+    "Cartão Motorista": "cartao_motorista",
+    "Cartão Cobrador": "cartao_cobrador",
+    "Orgão Gestor": "orgao_gestor",
+    "CMP TER SUB": "cmp_ter_sub",
+    "Tipo Viagem": "tipo_viagem_codigo",
+    "Intervalo Viagem": "intervalo_viagem",
+    "Terminal": "terminal",
+    "Tipo Data": "tipo_data",
+}
+
+COLUNAS_INT = {
+    "Catraca Pendente": "catraca_pendente",
     "Catraca Inicial": "catraca_inicial",
     "Catraca Final": "catraca_final",
     "Distância": "distancia_metros",
+    "Coleta Pendente": "coleta_pendente",
+    "Passageiros": "passageiros",
+    "Inteiras": "inteiras",
+    "VT": "vt",
+    "VT Integração": "vt_integracao",
+    "Gratuidade": "gratuidade",
+    "Passagens": "passagens",
+    "Bilhete Unitário": "bilhete_unitario",
+    "Passagens Integração": "passagens_integracao",
+    "Estudantes": "estudantes",
+    "EStudantes Integração": "estudantes_integracao",
 }
 
-COLUNA_VIAGEM_ID = "Viagem"
+COLUNAS_DATETIME = {
+    "Data Hora Início Operação": "data_hora_inicio",
+    "Data Hora Final Operação": "data_hora_fim",
+    "Data Hora Saída Terminal": "data_hora_saida_terminal",
+    "Data Hora Início": "data_hora_inicio_alt",
+    "Data Hora Inserção": "data_hora_insercao",
+}
+
+COLUNAS_DATE = {
+    "Data Coleta": "data_coleta",
+}
+
 COLUNAS_OBRIGATORIAS_MIN = [
     "Código Externo Linha",
     "Sub Linha",
@@ -47,21 +90,37 @@ class ResultadoImportacao:
 
 
 def _to_int(value) -> int | None:
-    if pd.isna(value):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    s = str(value).strip()
+    if not s or s.lower() in ("nan", "none"):
         return None
     try:
-        return int(float(str(value).replace(",", ".")))
+        return int(float(s.replace(",", ".")))
     except (ValueError, TypeError):
         return None
 
 
+def _to_str(value) -> str | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    s = str(value).strip()
+    return s or None
+
+
 def _to_datetime(value) -> datetime | None:
-    if pd.isna(value):
+    s = _to_str(value)
+    if s is None:
         return None
-    try:
-        return pd.to_datetime(value, errors="coerce").to_pydatetime()
-    except Exception:
+    dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
         return None
+    return dt.to_pydatetime()
+
+
+def _to_date(value) -> date | None:
+    dt = _to_datetime(value)
+    return dt.date() if dt else None
 
 
 def ler_csv_mco(file: IO | bytes | str) -> pd.DataFrame:
@@ -77,7 +136,7 @@ def ler_csv_mco(file: IO | bytes | str) -> pd.DataFrame:
         try:
             if hasattr(buffer, "seek"):
                 buffer.seek(0)
-            df = pd.read_csv(
+            return pd.read_csv(
                 buffer,
                 sep=";",
                 decimal=",",
@@ -85,38 +144,44 @@ def ler_csv_mco(file: IO | bytes | str) -> pd.DataFrame:
                 encoding=encoding,
                 keep_default_na=True,
             )
-            return df
         except UnicodeDecodeError:
             continue
     raise ValueError("Não foi possível decodificar o CSV (tentei utf-8 e latin-1).")
 
 
 def validar_colunas(df: pd.DataFrame) -> list[str]:
-    faltando = [c for c in COLUNAS_OBRIGATORIAS_MIN if c not in df.columns]
-    return faltando
+    return [c for c in COLUNAS_OBRIGATORIAS_MIN if c not in df.columns]
 
 
 def _df_para_registros(df: pd.DataFrame) -> list[dict]:
-    registros = []
+    registros: list[dict] = []
     for _, row in df.iterrows():
-        rec = {dest: row.get(orig) for orig, dest in COLUNAS_ESPERADAS.items() if orig in df.columns}
+        rec: dict = {}
 
-        rec["catraca_inicial"] = _to_int(rec.get("catraca_inicial"))
-        rec["catraca_final"] = _to_int(rec.get("catraca_final"))
-        rec["distancia_metros"] = _to_int(rec.get("distancia_metros")) or 0
-        rec["data_hora_inicio"] = _to_datetime(rec.get("data_hora_inicio"))
-        rec["data_hora_fim"] = _to_datetime(rec.get("data_hora_fim"))
+        for orig, dest in COLUNAS_TEXTO.items():
+            if orig in df.columns:
+                rec[dest] = _to_str(row.get(orig))
 
-        # Coluna W "Viagem" no CSV vem depois da Distância e contém o ID externo da viagem.
-        # No header BR, ambas se chamam "Viagem"; pandas renomeia a 2ª como "Viagem.1".
-        viagem_id = row.get("Viagem.1") if "Viagem.1" in df.columns else None
-        rec["viagem_id_externo"] = str(viagem_id).strip() if viagem_id and not pd.isna(viagem_id) else None
+        for orig, dest in COLUNAS_INT.items():
+            if orig in df.columns:
+                rec[dest] = _to_int(row.get(orig))
 
-        for k in ("codigo_externo_linha", "sublinha", "numero_veiculo", "tipo_viagem"):
-            if rec.get(k) is not None and not pd.isna(rec.get(k)):
-                rec[k] = str(rec[k]).strip()
-            else:
-                rec[k] = None
+        for orig, dest in COLUNAS_DATETIME.items():
+            if orig in df.columns:
+                rec[dest] = _to_datetime(row.get(orig))
+
+        for orig, dest in COLUNAS_DATE.items():
+            if orig in df.columns:
+                rec[dest] = _to_date(row.get(orig))
+
+        # ID externo da viagem é a 2ª ocorrência de "Viagem" no header
+        # (pandas renomeia para "Viagem.1").
+        viagem_id_raw = row.get("Viagem.1") if "Viagem.1" in df.columns else None
+        rec["viagem_id_externo"] = _to_str(viagem_id_raw)
+
+        # Distância é NOT NULL DEFAULT 0
+        if rec.get("distancia_metros") is None:
+            rec["distancia_metros"] = 0
 
         if not rec.get("codigo_externo_linha") or not rec.get("sublinha"):
             continue
@@ -127,7 +192,6 @@ def _df_para_registros(df: pd.DataFrame) -> list[dict]:
 
 def importar_mco(file: IO | bytes, nome_arquivo: str) -> ResultadoImportacao:
     df = ler_csv_mco(file)
-    erros: list[str] = []
 
     faltando = validar_colunas(df)
     if faltando:
@@ -164,5 +228,5 @@ def importar_mco(file: IO | bytes, nome_arquivo: str) -> ResultadoImportacao:
             qtd_linhas=len(registros),
             qtd_inseridas=inseridas,
             qtd_duplicadas=duplicadas,
-            erros=erros,
+            erros=[],
         )

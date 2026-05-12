@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String,
-    UniqueConstraint, Index,
+    BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer,
+    SmallInteger, String, UniqueConstraint, Index,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -49,21 +49,66 @@ class ViagemMCO(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     lote_id = Column(Integer, ForeignKey("lote_importacao.id", ondelete="CASCADE"), nullable=False)
+
+    # Identificação operadora / linha
+    codigo_operadora = Column(String(30), nullable=True)
     nome_operadora = Column(String(150), nullable=True)
     nome_garagem = Column(String(150), nullable=True)
     codigo_interno_linha = Column(String(30), nullable=True)
     codigo_externo_linha = Column(String(20), nullable=False)
     nome_linha = Column(String(255), nullable=True)
+    num_terminal = Column(String(30), nullable=True)
+
+    # Viagem (texto Nor./Extra) e veículo
     tipo_viagem = Column(String(20), nullable=True)
+    codigo_veiculo = Column(String(30), nullable=True)
     numero_veiculo = Column(String(20), nullable=True)
     desc_tipo_veiculo = Column(String(50), nullable=True)
+    codigo_equipamento = Column(String(30), nullable=True)
+    numero_serie_equipamento = Column(String(50), nullable=True)
+
+    # Sublinha e tempos
     sublinha = Column(String(10), nullable=False)
     data_hora_inicio = Column(DateTime, nullable=True)
     data_hora_fim = Column(DateTime, nullable=True)
+
+    # Catracas / distância
+    cartao_motorista = Column(String(30), nullable=True)
+    cartao_cobrador = Column(String(30), nullable=True)
+    catraca_pendente = Column(SmallInteger, nullable=True)
     catraca_inicial = Column(BigInteger, nullable=True)
     catraca_final = Column(BigInteger, nullable=True)
     distancia_metros = Column(Integer, nullable=False, default=0)
+
+    # ID externo da viagem (coluna W)
     viagem_id_externo = Column(String(30), nullable=True)
+
+    # Metadados da viagem
+    orgao_gestor = Column(String(30), nullable=True)
+    cmp_ter_sub = Column(String(30), nullable=True)
+    tipo_viagem_codigo = Column(String(20), nullable=True)
+    data_hora_saida_terminal = Column(DateTime, nullable=True)
+    coleta_pendente = Column(SmallInteger, nullable=True)
+
+    # Contagens (passageiros, tipos de tarifa)
+    passageiros = Column(Integer, nullable=True)
+    inteiras = Column(Integer, nullable=True)
+    vt = Column(Integer, nullable=True)
+    vt_integracao = Column(Integer, nullable=True)
+    gratuidade = Column(Integer, nullable=True)
+    passagens = Column(Integer, nullable=True)
+    bilhete_unitario = Column(Integer, nullable=True)
+    passagens_integracao = Column(Integer, nullable=True)
+    estudantes = Column(Integer, nullable=True)
+    estudantes_integracao = Column(Integer, nullable=True)
+
+    # Outros
+    intervalo_viagem = Column(String(20), nullable=True)
+    terminal = Column(String(30), nullable=True)
+    data_coleta = Column(Date, nullable=True)
+    tipo_data = Column(String(30), nullable=True)
+    data_hora_inicio_alt = Column(DateTime, nullable=True)
+    data_hora_insercao = Column(DateTime, nullable=True)
 
     lote = relationship("LoteImportacao", back_populates="viagens")
 
@@ -72,4 +117,6 @@ class ViagemMCO(Base):
         Index("ix_lote", "lote_id"),
         Index("ix_linha_sublinha", "codigo_externo_linha", "sublinha"),
         Index("ix_inicio", "data_hora_inicio"),
+        Index("ix_veiculo", "numero_veiculo"),
+        Index("ix_operadora", "nome_operadora"),
     )
