@@ -17,7 +17,24 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  app:
+    build: .
+    container_name: mco-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mco}
+      MYSQL_USER: ${MYSQL_USER:-mco}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mco}
+      PERCENTUAL_MINIMO: ${PERCENTUAL_MINIMO:-90.0}
+    ports:
+      - "${APP_PORT:-8501}:8501"
 
 volumes:
   mysql_data:
